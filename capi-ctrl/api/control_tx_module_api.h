@@ -2,7 +2,7 @@
 #define _GAIN_MODULE_API_H_
 
 /*==============================================================================
-  @file gain_api.h
+  @file control_tx_module_api.h
   @brief This file contains Gain Module APIs
 
   Copyright (c) 2019-2021 Qualcomm Technologies, Inc.
@@ -22,8 +22,8 @@
 #include "module_cmn_api.h"
 #include "imcl_control_tx_api.h"
 
-/** @h2xml_title1          {Gain Module API}
-    @h2xml_title_agile_rev {Gain Module API}
+/** @h2xml_title1          {Gain Control Module API}
+    @h2xml_title_agile_rev {Gain Control Module API}
     @h2xml_title_date      {Oct 03, 2019} */
 
 /*------------------------------------------------------------------------------
@@ -44,12 +44,13 @@
 #define MODULE_ID_GAIN_MODULE 0x10015658
 /** @h2xmlm_module       {"MODULE_ID_GAIN_MODULE",
                            MODULE_ID_GAIN_MODULE}
-    @h2xmlm_displayName  {"Gain Module"}
+    @h2xmlm_displayName  {"Gain Control Module"}
     @h2xmlm_modMajorType {2}
     @h2xmlm_description  {Gain Module \n
                           - Supports following params:
                           - PARAM_ID_MODULE_ENABLE
                           - PARAM_ID_GAIN_MODULE_GAIN
+                          - GAIN_PARAM_COEFF_ARR
                           - \n
                           - Supported Input Media Format:
                           - Data Format          : FIXED_POINT
@@ -91,6 +92,8 @@
 
 #include "spf_begin_pack.h"
 /* Payload for parameter param_id_gain_cfg_t */
+typedef struct param_id_module_gain_cfg_t param_id_module_gain_cfg_t;
+
 struct param_id_module_gain_cfg_t
 {
    uint16_t gain;
@@ -104,8 +107,29 @@ struct param_id_module_gain_cfg_t
 }
 #include "spf_end_pack.h"
 ;
-/* Structure type def for above payload. */
-typedef struct param_id_module_gain_cfg_t param_id_module_gain_cfg_t;
+
+#define GAIN_PARAM_COEFF_ARR 0x0800122F
+
+/* Structure definition for Parameter */
+typedef struct control_tx_coeff_arr_t control_tx_coeff_arr_t;
+
+/** @h2xmlp_parameter   {"GAIN_PARAM_COEFF_ARR",
+                         GAIN_PARAM_COEFF_ARR}
+    @h2xmlp_description {parameter used to send the coefficients to RX
+                         from the control module.} */
+#include "spf_begin_pack.h"
+
+struct control_tx_coeff_arr_t
+{
+   unsigned char coeff_val[4096];
+   /**< @h2xmle_description {Coefficient values}
+        @h2xmle_default     {0x00}
+        @h2xmle_range       {0..0xFF}
+        
+        @h2xmle_policy      {Basic} */
+}
+#include "spf_end_pack.h"
+;
 
 /**  @}                   <-- End of the Module -->*/
 

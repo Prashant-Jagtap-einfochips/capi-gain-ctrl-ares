@@ -25,6 +25,8 @@ Header file to implement the Gain block*/
 #include "capi.h"
 #include "ar_defs.h"
 
+#define CAPI_PARAM_ID_UPDATE_GAIN_COEFFS GAIN_PARAM_COEFF_ARR
+
 #ifdef __cplusplus
 extern "C" {
 #endif

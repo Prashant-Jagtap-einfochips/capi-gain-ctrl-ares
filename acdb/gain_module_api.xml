@@ -2,7 +2,7 @@
   title_date="Oct 03, 2019">
   <PROCESSORS/>
   <MODULE_LIST>
-    <MODULE name="MODULE_ID_GAIN_MODULE" id="0x10015656" displayName="Gain Module RX" modMajorType="0x2" description="Gain Module \n- Supports following params: -#[
+    <MODULE name="MODULE_ID_GAIN_MODULE" id="0x10015656" displayName="Gain Module" modMajorType="0x2" description="Gain Module \n- Supports following params: -#[
       #] PARAM_ID_MODULE_ENABLE - PARAM_ID_GAIN_MODULE_GAIN - \n- Supported Input Media Format: - Data Format          : FIXED_POINT - fmt_id               :#[
       #] Don't care - Sample Rates         : Don't care - Number of channels   : 1 to 32 - Channel type         : Don't care - Bits per sample      : 16, 32 - Q#[
       #] format             : Don't care - Interleaving         : de-interleaved unpacked - Signed/unsigned      : Signed" isOffloadable="true" builtin="false">
@@ -26,7 +26,7 @@
           <SUPPORTEDCONTTYPE name="Specialized" id="0xb001000"/>
           <SUPPORTEDCONTTYPE name="Generic" id="0xb001001"/>
         </SUPPORTEDCONTTYPES>
-        <STACKSIZE stackSize="0x1000"/>
+        <STACKSIZE stackSize="0x2000"/>
         <TOOL_POLICIES>
           <POLICY name="CALIBRATION"/>
         </TOOL_POLICIES>
@@ -61,6 +61,16 @@
               <RANGE name="0" value="0x0"/>
             </RANGE_LIST>
           </CONFIG_ELEMENT>
+        </PARAMETER>
+        <PARAMETER name="GAIN_PARAM_COEFF_ARR" pid="0x800122e" maxSize="0x1000" description="parameter used to send the coefficients to RX from the control#[
+          #] module.">
+          <TOOL_POLICIES>
+            <POLICY name="RTC"/>
+            <POLICY name="CALIBRATION"/>
+          </TOOL_POLICIES>
+          <DEFAULT_DEPENDENCIES/>
+          <CONFIG_ELEMENT name="coeff_val" type="uint8_t" typeUnSigned="true" byteSize="0x1" byteOffset="0x0" arrayElements="4096" min="0x0" max="0xff"
+            default="0x0" description="Coefficient values" policy="BASIC"/>
         </PARAMETER>
       </PARAMETER_LIST>
     </MODULE>

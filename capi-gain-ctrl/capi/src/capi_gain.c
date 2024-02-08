@@ -21,7 +21,7 @@
  * -----------------------------------------------------------------------*/
 #include "capi_gain.h"
 #include "capi_gain_utils.h"
-
+#include "gain_module_api.h"
 
 
 #include "capi_cmn_imcl_utils.h"
@@ -326,6 +326,21 @@ static capi_err_t capi_gain_set_param(capi_t *                _pif,
          break;
       }
       
+      case GAIN_PARAM_COEFF_ARR:
+      {
+         if (params_ptr->actual_data_len >= sizeof(control_tx_coeff_arr_t))
+         {
+            control_tx_coeff_arr_t *cfg_ptr = (control_tx_coeff_arr_t *)(params_ptr->data_ptr);
+            memcpy(me_ptr->coeff_val, cfg_ptr->coeff_val, sizeof(cfg_ptr->coeff_val));   
+         }
+         else
+         {
+            AR_MSG(DBG_ERROR_PRIO, "CAPI GAIN: <<set_param>> Bad param size %lu", params_ptr->actual_data_len);
+            return CAPI_ENEEDMORE;
+         }
+         break;
+      }
+	  
       case INTF_EXTN_PARAM_ID_IMCL_PORT_OPERATION:
       {
 	 AR_MSG(DBG_ERROR_PRIO,"IMC port operation handler here\n");
@@ -424,6 +439,26 @@ static capi_err_t capi_gain_get_param(capi_t *                _pif,
          }
          break;
       }
+	  
+      case GAIN_PARAM_COEFF_ARR:
+      {
+         if (params_ptr->max_data_len >= sizeof(control_tx_coeff_arr_t))
+         {
+            control_tx_coeff_arr_t *cfg_ptr = (control_tx_coeff_arr_t *)(params_ptr->data_ptr);
+            memcpy(cfg_ptr->coeff_val, me_ptr->coeff_val, sizeof(me_ptr->coeff_val));
+            params_ptr->actual_data_len    = sizeof(control_tx_coeff_arr_t);
+         }
+         else
+         {
+            AR_MSG(DBG_ERROR_PRIO,
+                   "CAPI GAIN: <<get_param>> Bad param size %lu  Param id = %lu",
+                   params_ptr->max_data_len,
+                   param_id);
+            return CAPI_ENEEDMORE;
+         }
+         break;
+      }
+	  
       default:
       {
          AR_MSG(DBG_ERROR_PRIO, "CAPI GAIN: Get, unsupported param ID 0x%x", param_id);
@@ -547,6 +582,21 @@ capi_err_t GainRx_imc_set_param_handler (capi_gain_t * me_ptr, capi_buf_t * inte
 
             break;
          }
+
+         case PARAM_ID_GAIN_COEFF_IMC_PAYLOAD:
+         {
+            if (header_ptr->actual_data_len < sizeof(capi_gain_coeff_arr_payload_t))
+            {
+               AR_MSG(DBG_ERROR_PRIO,"IMC Param id 0x%lx Invalid payload size for incoming data %d",header_ptr->opcode, header_ptr->actual_data_len);
+               return CAPI_ENEEDMORE;
+            }
+
+            capi_gain_coeff_arr_payload_t *cfg_ptr = (capi_gain_coeff_arr_payload_t *) payload_ptr;
+            memcpy(me_ptr->coeff_val, cfg_ptr->coeff_val, sizeof(cfg_ptr->coeff_val));
+
+            break;
+         }
+         
          default:
          {
             AR_MSG(DBG_ERROR_PRIO,"Unsupported opcode for incoming data over IMCL %d", header_ptr->opcode);

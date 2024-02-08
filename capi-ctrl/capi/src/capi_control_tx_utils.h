@@ -123,6 +123,7 @@ typedef struct capi_gain_t
 
    /* Struct to store gain configuration*/
    capi_gain_configuration_t gain_config;
+   uint8_t                 coeff_val[4096];
    
    /* IMCL */
    gain_is_ctrl_port_info_rcvd_t   	  is_ctrl_port_received; 

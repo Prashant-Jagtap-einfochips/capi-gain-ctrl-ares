@@ -67,6 +67,19 @@ typedef struct capi_gain_control_data_payload_t
         @h2xmle_policy      {Basic} */
 } capi_gain_control_data_payload_t;
 
+#define PARAM_ID_GAIN_COEFF_IMC_PAYLOAD 0x18001233
+
+typedef struct capi_gain_coeff_arr_payload_t
+{
+
+   uint8_t coeff_val[4096];
+   /**< @h2xmle_description {Coefficient values}
+        @h2xmle_default     {0x00}
+        @h2xmle_range       {0..0xFF}
+        
+        @h2xmle_policy      {Basic} */
+} capi_gain_coeff_arr_payload_t;
+
 #ifdef __cplusplus
 }
 #endif /*__cplusplus*/

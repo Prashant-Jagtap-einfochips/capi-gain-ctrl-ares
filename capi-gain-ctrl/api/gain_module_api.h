@@ -35,7 +35,7 @@
 /* Output port ID of Gain module */
 #define GAIN_MODULE_DATA_OUTPUT_PORT 0x1
 
-#define GAIN_MODULE_STACK_SIZE 4096
+#define GAIN_MODULE_STACK_SIZE 8192
 /*==============================================================================
    Module
 ==============================================================================*/
@@ -44,7 +44,7 @@
 #define MODULE_ID_GAIN_MODULE 0x10015656
 /** @h2xmlm_module       {"MODULE_ID_GAIN_MODULE",
                            MODULE_ID_GAIN_MODULE}
-    @h2xmlm_displayName  {"Gain Module"}
+    @h2xmlm_displayName  {"Gain Data Module"}
     @h2xmlm_modMajorType {2}
     @h2xmlm_description  {Gain Module \n
                           - Supports following params:
@@ -107,6 +107,28 @@ struct param_id_module_gain_cfg_t
 /* Structure type def for above payload. */
 typedef struct param_id_module_gain_cfg_t param_id_module_gain_cfg_t;
 
+#define GAIN_PARAM_COEFF_ARR 0x0800122E
+
+/* Structure definition for Parameter */
+typedef struct control_tx_coeff_arr_t control_tx_coeff_arr_t;
+
+/** @h2xmlp_parameter   {"GAIN_PARAM_COEFF_ARR",
+                         GAIN_PARAM_COEFF_ARR}
+    @h2xmlp_description {parameter used to send the coefficients to RX
+                         from the control module.} */
+#include "spf_begin_pack.h"
+
+struct control_tx_coeff_arr_t
+{
+   uint8_t coeff_val[4096];
+   /**< @h2xmle_description {Coefficient values}
+        @h2xmle_default     {0x00}
+        @h2xmle_range       {0..0xFF}
+        
+        @h2xmle_policy      {Basic} */
+}
+#include "spf_end_pack.h"
+;
 /**  @}                   <-- End of the Module -->*/
 
 #endif //_GAIN_MODULE_API_H_

@@ -21,7 +21,7 @@
  * -----------------------------------------------------------------------*/
 #include "capi_control_tx.h"
 #include "capi_control_tx_utils.h"
-
+#include "control_tx_module_api.h"
 
 //IMCL
  #include "capi_cmn_imcl_utils.h"
@@ -72,17 +72,17 @@ capi_err_t capi_control_tx_get_static_properties(capi_proplist_t *init_set_prope
       capi_result = capi_control_tx_process_get_properties((capi_gain_t *)NULL, static_properties);
       if (CAPI_FAILED(capi_result))
       {
-         AR_MSG(DBG_ERROR_PRIO, "CAPI GAIN: get static properties failed!");
+         AR_MSG(DBG_ERROR_PRIO, "CAPI CONTROL: get static properties failed!");
          return capi_result;
       }
       else
       {
-         AR_MSG(DBG_HIGH_PRIO, "CAPI GAIN: get static properties successful");
+         AR_MSG(DBG_HIGH_PRIO, "CAPI CONTROL: get static properties successful");
       }
    }
    else
    {
-      AR_MSG(DBG_ERROR_PRIO, "CAPI GAIN: Get static properties received NULL bad pointer");
+      AR_MSG(DBG_ERROR_PRIO, "CAPI CONTROL: Get static properties received NULL bad pointer");
    }
 
    return capi_result;
@@ -100,7 +100,7 @@ capi_err_t capi_control_tx_init(capi_t *_pif, capi_proplist_t *init_set_properti
 
    if (NULL == _pif || NULL == init_set_properties)
    {
-      AR_MSG(DBG_ERROR_PRIO, "CAPI GAIN: Init received NULL pointers, failing");
+      AR_MSG(DBG_ERROR_PRIO, "CAPI CONTROL: Init received NULL pointers, failing");
       return CAPI_EBADPARAM;
    }
 
@@ -130,12 +130,12 @@ capi_err_t capi_control_tx_init(capi_t *_pif, capi_proplist_t *init_set_properti
       capi_result = capi_control_tx_process_set_properties(me_ptr, init_set_properties);
       if (CAPI_FAILED(capi_result))
       {
-         AR_MSG(DBG_ERROR_PRIO, "CAPI GAIN:  Initialization Set Property Failed");
+         AR_MSG(DBG_ERROR_PRIO, "CAPI CONTROL:  Initialization Set Property Failed");
          return capi_result;
       }
    }
 
-   AR_MSG(DBG_HIGH_PRIO, "CAPI GAIN: Initialization completed !!");
+   AR_MSG(DBG_HIGH_PRIO, "CAPI CONTROL: Initialization completed !!");
    return capi_result;
 }
 
@@ -165,77 +165,6 @@ static capi_err_t capi_control_tx_process(capi_t *_pif, capi_stream_data_t *inpu
    output[0]->flags = input[0]->flags;
 
    return capi_result;
-
-#if 0
-   AR_MSG(DBG_HIGH_PRIO, "CAPI GAIN: INSIDE PROCESS");
-
-   capi_err_t   capi_result = CAPI_EOK;
-   capi_gain_t *me_ptr      = (capi_gain_t *)_pif;
-
-   if ((!input[0]) && (!output[0]))
-   {
-      AR_MSG(DBG_ERROR_PRIO, "CAPI GAIN: Process: No input or output buffer provided");
-      return CAPI_EFAILED;
-   }
-
-   /* Call library function to process data*/
-   uint32_t samples_to_process;
-   int32_t  byte_sample_convert = (BIT_WIDTH_16 == me_ptr->operating_media_fmt.format.bits_per_sample) ? 1 : 2;
-
-   int32_t inp_samples = input[0]->buf_ptr[0].actual_data_len >> byte_sample_convert;
-   int32_t out_samples = output[0]->buf_ptr[0].max_data_len >> byte_sample_convert;
-
-   /* Samples to process is the minimum of the input and output lengths available*/
-   samples_to_process = (inp_samples < out_samples) ? inp_samples : out_samples;
-
-   for (uint32_t ch = 0; ch < me_ptr->operating_media_fmt.format.num_channels; ch++)
-   {
-      if (BIT_WIDTH_16 == me_ptr->operating_media_fmt.format.bits_per_sample)
-      {
-         example_apply_gain_16((int16_t *)output[0]->buf_ptr[ch].data_ptr,
-                               (int16_t *)input[0]->buf_ptr[ch].data_ptr,
-                               me_ptr->gain_config.gain_q12,
-                               samples_to_process);
-         output[0]->buf_ptr[ch].actual_data_len = samples_to_process << 1;
-         input[0]->buf_ptr[ch].actual_data_len  = samples_to_process << 1;
-      }
-      else
-      {
-         if ((uint16_t)(me_ptr->gain_config.gain_q12 >> 12) > 0)
-         {
-            // for gain greater than 1
-            example_apply_gain_32_G1((int32_t *)output[0]->buf_ptr[ch].data_ptr,
-                                     (int32_t *)input[0]->buf_ptr[ch].data_ptr,
-                                     me_ptr->gain_config.gain_q12,
-                                     samples_to_process,
-                                     me_ptr->operating_media_fmt.format.q_factor);
-         }
-         else
-         {
-            // for gain less than 1
-            example_apply_gain_32_L1((int32_t *)output[0]->buf_ptr[ch].data_ptr,
-                                     (int32_t *)input[0]->buf_ptr[ch].data_ptr,
-                                     me_ptr->gain_config.gain_q12,
-                                     samples_to_process,
-                                     me_ptr->operating_media_fmt.format.q_factor);
-         }
-         output[0]->buf_ptr[ch].actual_data_len = samples_to_process << 2;
-         input[0]->buf_ptr[ch].actual_data_len  = samples_to_process << 2;
-      }
-   }
-
-   if (samples_to_process)
-   {
-      output[0]->flags = input[0]->flags; // Copying flags from input to output
-
-      if (input[0]->flags.is_timestamp_valid) // updating timestamps
-      {
-         output[0]->timestamp = input[0]->timestamp - me_ptr->events_info.delay_in_us;
-      }
-   }
-
-   return capi_result;
-#endif   
    
 }
 
@@ -258,7 +187,7 @@ static capi_err_t capi_control_tx_end(capi_t *_pif)
    capi_gain_t *me_ptr   = (capi_gain_t *)_pif;
    me_ptr->vtbl.vtbl_ptr = NULL;
 
-   AR_MSG(DBG_HIGH_PRIO, "CAPI GAIN: End done");
+   AR_MSG(DBG_HIGH_PRIO, "CAPI CONTROL: End done");
    return capi_result;
 }
 
@@ -278,7 +207,7 @@ static capi_err_t capi_control_tx_set_param(capi_t *                _pif,
    capi_err_t capi_result = CAPI_EOK;
    if (NULL == _pif || NULL == params_ptr)
    {
-      AR_MSG(DBG_HIGH_PRIO, "CAPI GAIN: End done");
+      AR_MSG(DBG_HIGH_PRIO, "CAPI CONTROL: End done");
       return CAPI_EBADPARAM;
    }
 
@@ -295,21 +224,21 @@ static capi_err_t capi_control_tx_set_param(capi_t *                _pif,
             me_ptr->gain_config.enable                       = gain_module_enable_ptr->enable;
             if (me_ptr->gain_config.enable)
             {
-               AR_MSG(DBG_HIGH_PRIO, "CAPI GAIN: PARAM_ID_MODULE_ENABLE, %lu", me_ptr->gain_config.enable);
+               AR_MSG(DBG_HIGH_PRIO, "CAPI CONTROL: PARAM_ID_MODULE_ENABLE, %lu", me_ptr->gain_config.enable);
             }
             else
             {
-               AR_MSG(DBG_HIGH_PRIO, "CAPI GAIN: PARAM_ID_MODULE_ENABLE, %lu", me_ptr->gain_config.enable);
+               AR_MSG(DBG_HIGH_PRIO, "CAPI CONTROL: PARAM_ID_MODULE_ENABLE, %lu", me_ptr->gain_config.enable);
             }
             /* Raise process check event based on enable value set here*/
             capi_result |= capi_gain_raise_process_event(me_ptr, me_ptr->gain_config.enable);
 
-            AR_MSG(DBG_HIGH_PRIO, "CAPI GAIN: PARAM_ID_MODULE_ENABLE, %lu", me_ptr->gain_config.enable);
+            AR_MSG(DBG_HIGH_PRIO, "CAPI CONTROL: PARAM_ID_MODULE_ENABLE, %lu", me_ptr->gain_config.enable);
          }
          else
          {
             AR_MSG(DBG_ERROR_PRIO,
-                   "CAPI GAIN: PARAM_ID_MODULE_ENABLE, Bad param size %lu",
+                   "CAPI CONTROL: PARAM_ID_MODULE_ENABLE, Bad param size %lu",
                    params_ptr->actual_data_len);
 
             capi_result |= CAPI_ENEEDMORE;
@@ -338,7 +267,7 @@ static capi_err_t capi_control_tx_set_param(capi_t *                _pif,
 #endif
             /* Raise process check event*/
             capi_result |= capi_gain_raise_process_event(me_ptr, enable);
-            AR_MSG(DBG_HIGH_PRIO, "CAPI GAIN: PARAM_ID_GAIN %d", me_ptr->gain_config.gain_q13);
+            AR_MSG(DBG_HIGH_PRIO, "CAPI CONTROL: PARAM_ID_GAIN %d", me_ptr->gain_config.gain_q13);
             
             
             
@@ -413,8 +342,88 @@ static capi_err_t capi_control_tx_set_param(capi_t *                _pif,
          }
          else
          {
-            AR_MSG(DBG_HIGH_PRIO, "CAPI GAIN: PARAM_ID_GAIN %d", me_ptr->gain_config.gain_q13);
+            AR_MSG(DBG_HIGH_PRIO, "CAPI CONTROL: PARAM_ID_GAIN %d", me_ptr->gain_config.gain_q13);
             CAPI_SET_ERROR(capi_result, CAPI_ENEEDMORE);
+         }
+         break;
+      }
+	  
+      case GAIN_PARAM_COEFF_ARR:
+      {
+         if (params_ptr->actual_data_len >= sizeof(control_tx_coeff_arr_t))
+         {
+		control_tx_coeff_arr_t *cfg_ptr = (control_tx_coeff_arr_t *)(params_ptr->data_ptr);
+		memcpy(me_ptr->coeff_val, cfg_ptr->coeff_val, sizeof(cfg_ptr->coeff_val));             
+             
+		///////////// Calling IMCL stuff here
+               
+		capi_err_t result = CAPI_EOK;
+		capi_buf_t buf;
+		uint32_t control_port_id = 0;
+		imcl_port_state_t port_state = CTRL_PORT_CLOSE;
+   		buf.actual_data_len = sizeof(gain_imcl_header_t) + sizeof(capi_gain_coeff_arr_payload_t);
+         	buf.data_ptr = NULL;
+         	buf.max_data_len = 0;
+
+         	imcl_outgoing_data_flag_t flags;
+         	flags.should_send = TRUE;
+         	flags.is_trigger = FALSE;
+   
+         	// Get the first control port id for the intent #INTENT_ID_GAIN_CONTROL
+         	capi_cmn_ctrl_port_list_get_next_port_data(&me_ptr->ctrl_port_info,
+                                              INTENT_ID_GAIN_CONTROL,
+                                              control_port_id, // initially, an invalid port id
+                                              &me_ptr->ctrl_port_ptr);
+
+         	if (me_ptr->ctrl_port_ptr)
+         	{
+            		control_port_id = me_ptr->ctrl_port_ptr->port_info.port_id;
+            		port_state = me_ptr->ctrl_port_ptr->state;
+         	}
+         	else
+         	{
+            		AR_MSG_ISLAND(DBG_ERROR_PRIO,"Port data ptr doesnt exist. ctrl port id=0x%x port state = 0x%x",control_port_id, port_state);
+         	}
+
+         	if (0 != control_port_id) {
+            		if (CTRL_PORT_PEER_CONNECTED == port_state)
+            		{
+               		// Get one time buf from the queue
+               		result |= capi_cmn_imcl_get_one_time_buf(&me_ptr->cb_info, control_port_id, buf.actual_data_len, &buf);
+      
+               		AR_MSG_ISLAND(DBG_ERROR_PRIO,"buf.actual_data_len=0x%x", buf.actual_data_len);
+
+               		if (CAPI_FAILED(result) || NULL == buf.data_ptr)
+               		{
+                  			AR_MSG(DBG_ERROR_PRIO,"Getting one time buffer failed");
+                  			return result;
+               		}
+               		gain_imcl_header_t *out_cfg_ptr = (gain_imcl_header_t *)buf.data_ptr;
+               		capi_gain_coeff_arr_payload_t *data_over_imc_payload = (capi_gain_coeff_arr_payload_t*)(out_cfg_ptr + 1);
+
+               		out_cfg_ptr->opcode = PARAM_ID_GAIN_COEFF_IMC_PAYLOAD;
+               		out_cfg_ptr->actual_data_len = sizeof(capi_gain_coeff_arr_payload_t);
+               		memcpy(data_over_imc_payload->coeff_val, me_ptr->coeff_val, sizeof(me_ptr->coeff_val));
+               		// send data to peer/destination module
+               		if (CAPI_SUCCEEDED(capi_cmn_imcl_send_to_peer(&me_ptr->cb_info, &buf, control_port_id, flags)))
+               		{
+                  			//AR_MSG(DBG_HIGH_PRIO,"Enable %d and factor %d sent to control port 0x%x", data_over_imc_payload->coeff_val[0], control_port_id);
+               		}
+            		}
+            		else
+            		{
+               		AR_MSG(DBG_ERROR_PRIO,"Control port is not connected");
+            		}              
+         	}
+         	else {
+			AR_MSG(DBG_ERROR_PRIO,"Control port id is not proper");
+	 	}
+            	/////////////////////////// IMCL ends here            	           
+         }
+         else
+         {
+            AR_MSG(DBG_ERROR_PRIO, "CAPI CONTROL: <<set_param>> Bad param size %lu", params_ptr->actual_data_len);
+            return CAPI_ENEEDMORE;
          }
          break;
       }
@@ -426,6 +435,7 @@ static capi_err_t capi_control_tx_set_param(capi_t *                _pif,
             &me_ptr->ctrl_port_info, params_ptr, 
             (POSAL_HEAP_ID)me_ptr->heap_info.heap_id, 0, 1, supported_intent);
 
+#if 0
                ///////////// Calling IMCL stuff here
                
                capi_err_t result = CAPI_EOK;
@@ -491,14 +501,16 @@ static capi_err_t capi_control_tx_set_param(capi_t *                _pif,
          	else {
 			AR_MSG(DBG_ERROR_PRIO,"Control port id is not proper");
 	 	}
-            	/////////////////////////// IMCL ends here            	
+            	/////////////////////////// IMCL ends here     
+#endif       	
+         break;
 
       }
       
       
       default:
       {
-         AR_MSG(DBG_ERROR_PRIO, "CAPI GAIN: Set, unsupported param ID 0x%x", (int)param_id);
+         AR_MSG(DBG_ERROR_PRIO, "CAPI CONTROL: Set, unsupported param ID 0x%x", (int)param_id);
          CAPI_SET_ERROR(capi_result, CAPI_EUNSUPPORTED);
          break;
       }
@@ -524,7 +536,7 @@ static capi_err_t capi_control_tx_get_param(capi_t *                _pif,
    capi_err_t capi_result = CAPI_EOK;
    if (NULL == _pif || NULL == params_ptr)
    {
-      AR_MSG(DBG_ERROR_PRIO, "CAPI GAIN: Set, unsupported param ID 0x%x", (int)param_id);
+      AR_MSG(DBG_ERROR_PRIO, "CAPI CONTROL: Set, unsupported param ID 0x%x", (int)param_id);
       return CAPI_EBADPARAM;
    }
 
@@ -534,7 +546,7 @@ static capi_err_t capi_control_tx_get_param(capi_t *                _pif,
    {
       case PARAM_ID_MODULE_ENABLE:
       {
-         AR_MSG(DBG_HIGH_PRIO, "CAPI GAIN: GET PARAM");
+         AR_MSG(DBG_HIGH_PRIO, "CAPI CONTROL: GET PARAM");
          if (params_ptr->max_data_len >= sizeof(param_id_module_enable_t))
          {
             param_id_module_enable_t *enable_ptr = (param_id_module_enable_t *)(params_ptr->data_ptr);
@@ -545,7 +557,7 @@ static capi_err_t capi_control_tx_get_param(capi_t *                _pif,
          }
          else
          {
-            AR_MSG(DBG_ERROR_PRIO, "CAPI GAIN: Get Enable Param, Bad payload size %d", params_ptr->max_data_len);
+            AR_MSG(DBG_ERROR_PRIO, "CAPI CONTROL: Get Enable Param, Bad payload size %d", params_ptr->max_data_len);
             capi_result = CAPI_ENEEDMORE;
          }
          break;
@@ -559,20 +571,38 @@ static capi_err_t capi_control_tx_get_param(capi_t *                _pif,
             /* Fetch the gain values which were set to the lib*/
             gain_cfg_ptr->gain     = me_ptr->gain_config.gain_q13;
             gain_cfg_ptr->reserved = 0;
-            AR_MSG(DBG_HIGH_PRIO, "CAPI GAIN:GET PARAM: gain = 0x%lx", gain_cfg_ptr->gain);
+            AR_MSG(DBG_HIGH_PRIO, "CAPI CONTROL:GET PARAM: gain = 0x%lx", gain_cfg_ptr->gain);
             /* Populate actual data length*/
             params_ptr->actual_data_len = sizeof(param_id_module_gain_cfg_t);
          }
          else
          {
-            AR_MSG(DBG_ERROR_PRIO, "CAPI GAIN: Get, Bad param size %lu", params_ptr->max_data_len);
+            AR_MSG(DBG_ERROR_PRIO, "CAPI CONTROL: Get, Bad param size %lu", params_ptr->max_data_len);
             capi_result = CAPI_ENEEDMORE;
          }
          break;
       }
+      case GAIN_PARAM_COEFF_ARR:
+      {
+      	if (params_ptr->max_data_len >= sizeof(control_tx_coeff_arr_t))
+      	{
+		    control_tx_coeff_arr_t *gain_cfg_ptr = (control_tx_coeff_arr_t *)(params_ptr->data_ptr);
+		    memcpy(gain_cfg_ptr->coeff_val, me_ptr->coeff_val, sizeof(me_ptr->coeff_val));
+		    params_ptr->actual_data_len    = sizeof(control_tx_coeff_arr_t);
+	    }
+	    else
+        {
+            AR_MSG(DBG_ERROR_PRIO,
+                   "CAPI CONTROL: <<get_param>> Bad param size %lu  Param id = %lu",
+                   params_ptr->max_data_len,
+                   param_id);
+            return CAPI_ENEEDMORE;
+        }
+	break;
+      }
       default:
       {
-         AR_MSG(DBG_ERROR_PRIO, "CAPI GAIN: Get, unsupported param ID 0x%x", param_id);
+         AR_MSG(DBG_ERROR_PRIO, "CAPI CONTROL: Get, unsupported param ID 0x%x", param_id);
          capi_result |= CAPI_EUNSUPPORTED;
          break;
       }
