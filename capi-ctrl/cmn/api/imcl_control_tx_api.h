@@ -80,6 +80,18 @@ typedef struct capi_gain_coeff_arr_payload_t
         @h2xmle_policy      {Basic} */
 } capi_gain_coeff_arr_payload_t;
 
+#define PARAM_ID_MUTE_IMC_PAYLOAD 0x18001234
+
+typedef struct capi_gain_mute_payload_t
+{
+   uint32_t mute;
+   /*#< @h2xmle_description {Mute parameter}
+        @h2xmle_rangeList   {"Disable"=0;
+                             "Enable"=1}
+        @h2xmle_default     {0}
+        @h2xmle_policy      {Basic} */
+} capi_gain_mute_payload_t;
+
 #ifdef __cplusplus
 }
 #endif /*__cplusplus*/

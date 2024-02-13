@@ -24,11 +24,13 @@
 #include "control_tx_module_api.h"
 
 //IMCL
- #include "capi_cmn_imcl_utils.h"
- #include "capi_intf_extn_imcl.h"
- #include "capi_cmn_ctrl_port_list.h"
- #include "capi_cmn.h"
- #include "imcl_control_tx_api.h"
+#include "capi_cmn_imcl_utils.h"
+#include "capi_intf_extn_imcl.h"
+#include "capi_cmn_ctrl_port_list.h"
+#include "capi_cmn.h"
+#include "imcl_control_tx_api.h"
+ 
+#include "HAP_perf.h"
 
 
 // todo: try multichannel test cases (maybe 16 channels. It should work fine.)
@@ -119,6 +121,9 @@ capi_err_t capi_control_tx_init(capi_t *_pif, capi_proplist_t *init_set_properti
    uint16_t apply_gain          = 0x2000;
    me_ptr->gain_config.gain_q12 = apply_gain >> 1;
    me_ptr->gain_config.gain_q13 = apply_gain;
+   
+   /* Disable mute parameter by default */
+   me_ptr->mute = 0;
    
     //IMCL
    me_ptr->is_ctrl_port_received = GAIN_CTRL_PORT_INFO_NOT_RCVD;
@@ -216,11 +221,11 @@ static capi_err_t capi_control_tx_set_param(capi_t *                _pif,
    switch (param_id)
    {
       /* parameter to enable the gain module */
-      case PARAM_ID_MODULE_ENABLE:
+      case PARAM_MOD_CONTROL_ENABLE:
       {
-         if (params_ptr->actual_data_len >= sizeof(param_id_module_enable_t))
+         if (params_ptr->actual_data_len >= sizeof(control_module_enable_t))
          {
-            param_id_module_enable_t *gain_module_enable_ptr = (param_id_module_enable_t *)(params_ptr->data_ptr);
+            control_module_enable_t *gain_module_enable_ptr = (control_module_enable_t *)(params_ptr->data_ptr);
             me_ptr->gain_config.enable                       = gain_module_enable_ptr->enable;
             if (me_ptr->gain_config.enable)
             {
@@ -256,24 +261,24 @@ static capi_err_t capi_control_tx_set_param(capi_t *                _pif,
             /* Determine if gain module should be enabled
              * Module is enabled if PARAM_ID_MODULE_ENABLE was set to enable AND
              * if the gain value is not unity in Q13 format */
+#if 0
             uint32_t enable = TRUE;
 
-#if 0
             if (Q13_UNITY_GAIN == me_ptr->gain_config.gain_q12 << 1)
             {
                enable = FALSE;
             }
             enable = enable && ((me_ptr->gain_config.enable == 0) ? 0 : 1);
-#endif
             /* Raise process check event*/
             capi_result |= capi_gain_raise_process_event(me_ptr, enable);
+#endif
             AR_MSG(DBG_HIGH_PRIO, "CAPI CONTROL: PARAM_ID_GAIN %d", me_ptr->gain_config.gain_q13);
             
             
             
             ///////////// Calling IMCL stuff here
                
-                capi_err_t result = CAPI_EOK;
+            capi_err_t result = CAPI_EOK;
          	capi_buf_t buf;
          	uint32_t control_port_id = 0;
          	imcl_port_state_t port_state = CTRL_PORT_CLOSE;
@@ -294,51 +299,51 @@ static capi_err_t capi_control_tx_set_param(capi_t *                _pif,
 
          	if (me_ptr->ctrl_port_ptr)
          	{
-            		control_port_id = me_ptr->ctrl_port_ptr->port_info.port_id;
-            		port_state = me_ptr->ctrl_port_ptr->state;
+               control_port_id = me_ptr->ctrl_port_ptr->port_info.port_id;
+               port_state = me_ptr->ctrl_port_ptr->state;
          	}
          	else
          	{
-            		AR_MSG_ISLAND(DBG_ERROR_PRIO,"Port data ptr doesnt exist. ctrl port id=0x%x port state = 0x%x",control_port_id, port_state);
+               AR_MSG_ISLAND(DBG_ERROR_PRIO,"Port data ptr doesnt exist. ctrl port id=0x%x port state = 0x%x",control_port_id, port_state);
          	}
 
-         	if (0 != control_port_id) {
-            		me_ptr->is_ctrl_port_received = GAIN_CTRL_PORT_INFO_RCVD;
-            		if (CTRL_PORT_PEER_CONNECTED == port_state)
-            		{
-               		// Get one time buf from the queue
-               		result |= capi_cmn_imcl_get_one_time_buf(&me_ptr->cb_info, control_port_id, buf.actual_data_len, &buf);
-      
-               		AR_MSG_ISLAND(DBG_ERROR_PRIO,"buf.actual_data_len=0x%x", buf.actual_data_len);
-
-               		if (CAPI_FAILED(result) || NULL == buf.data_ptr)
-               		{
-                  			AR_MSG(DBG_ERROR_PRIO,"Getting one time buffer failed");
-                  			return result;
-               		}
-               		gain_imcl_header_t *out_cfg_ptr = (gain_imcl_header_t *)buf.data_ptr;
-               		capi_gain_control_data_payload_t *data_over_imc_payload = (capi_gain_control_data_payload_t*)(out_cfg_ptr + 1);
-
-               		out_cfg_ptr->opcode = PARAM_ID_GAIN_CONTROL_IMC_PAYLOAD;
-               		out_cfg_ptr->actual_data_len = sizeof(capi_gain_control_data_payload_t);
-               		data_over_imc_payload->gain = me_ptr->gain_config.gain_q13;
-               		// send data to peer/destination module
-               		if (CAPI_SUCCEEDED(capi_cmn_imcl_send_to_peer(&me_ptr->cb_info, &buf, control_port_id, flags)))
-               		{
-                  			AR_MSG(DBG_HIGH_PRIO,"Enable %d and dec factor %d sent to control port 0x%x", data_over_imc_payload->gain, control_port_id);
-               		}
-            		}
-            		else
-            		{
-               		AR_MSG(DBG_ERROR_PRIO,"Control port is not connected");
-            		}              
+         	if (0 != control_port_id)
+			{
+               me_ptr->is_ctrl_port_received = GAIN_CTRL_PORT_INFO_RCVD;
+               if (CTRL_PORT_PEER_CONNECTED == port_state)
+               {
+                  // Get one time buf from the queue
+                  result |= capi_cmn_imcl_get_one_time_buf(&me_ptr->cb_info, control_port_id, buf.actual_data_len, &buf);
+               
+                  AR_MSG_ISLAND(DBG_ERROR_PRIO,"buf.actual_data_len=0x%x", buf.actual_data_len);
+               
+                  if (CAPI_FAILED(result) || NULL == buf.data_ptr)
+                  {
+                     AR_MSG(DBG_ERROR_PRIO,"Getting one time buffer failed");
+                     return result;
+                  }
+                  gain_imcl_header_t *out_cfg_ptr = (gain_imcl_header_t *)buf.data_ptr;
+                  capi_gain_control_data_payload_t *data_over_imc_payload = (capi_gain_control_data_payload_t*)(out_cfg_ptr + 1);
+                  
+                  out_cfg_ptr->opcode = PARAM_ID_GAIN_CONTROL_IMC_PAYLOAD;
+                  out_cfg_ptr->actual_data_len = sizeof(capi_gain_control_data_payload_t);
+                  data_over_imc_payload->gain = me_ptr->gain_config.gain_q13;
+               
+			      // send data to peer/destination module
+                  if (CAPI_SUCCEEDED(capi_cmn_imcl_send_to_peer(&me_ptr->cb_info, &buf, control_port_id, flags)))
+                  {
+                     AR_MSG(DBG_HIGH_PRIO,"Enable %d and dec factor %d sent to control port 0x%x", data_over_imc_payload->gain, control_port_id);
+                  }
+               }
+               else
+               {
+                  AR_MSG(DBG_ERROR_PRIO,"Control port is not connected");
+               }              
          	}
          	else {
-			AR_MSG(DBG_ERROR_PRIO,"Control port id is not proper");
-	 	}
-            	/////////////////////////// IMCL ends here    
-            
-            
+			   AR_MSG(DBG_ERROR_PRIO,"Control port id is not proper");
+	 	    }
+            /////////////////////////// IMCL ends here    
          }
          else
          {
@@ -352,16 +357,16 @@ static capi_err_t capi_control_tx_set_param(capi_t *                _pif,
       {
          if (params_ptr->actual_data_len >= sizeof(control_tx_coeff_arr_t))
          {
-		control_tx_coeff_arr_t *cfg_ptr = (control_tx_coeff_arr_t *)(params_ptr->data_ptr);
-		memcpy(me_ptr->coeff_val, cfg_ptr->coeff_val, sizeof(cfg_ptr->coeff_val));             
+		    control_tx_coeff_arr_t *cfg_ptr = (control_tx_coeff_arr_t *)(params_ptr->data_ptr);
+		    memcpy(me_ptr->coeff_val, cfg_ptr->coeff_val, sizeof(cfg_ptr->coeff_val));             
              
-		///////////// Calling IMCL stuff here
+		    ///////////// Calling IMCL stuff here
                
-		capi_err_t result = CAPI_EOK;
-		capi_buf_t buf;
-		uint32_t control_port_id = 0;
-		imcl_port_state_t port_state = CTRL_PORT_CLOSE;
-   		buf.actual_data_len = sizeof(gain_imcl_header_t) + sizeof(capi_gain_coeff_arr_payload_t);
+		    capi_err_t result = CAPI_EOK;
+		    capi_buf_t buf;
+		    uint32_t control_port_id = 0;
+		    imcl_port_state_t port_state = CTRL_PORT_CLOSE;
+   		    buf.actual_data_len = sizeof(gain_imcl_header_t) + sizeof(capi_gain_coeff_arr_payload_t);
          	buf.data_ptr = NULL;
          	buf.max_data_len = 0;
 
@@ -377,48 +382,48 @@ static capi_err_t capi_control_tx_set_param(capi_t *                _pif,
 
          	if (me_ptr->ctrl_port_ptr)
          	{
-            		control_port_id = me_ptr->ctrl_port_ptr->port_info.port_id;
-            		port_state = me_ptr->ctrl_port_ptr->state;
+               control_port_id = me_ptr->ctrl_port_ptr->port_info.port_id;
+               port_state = me_ptr->ctrl_port_ptr->state;
          	}
          	else
          	{
-            		AR_MSG_ISLAND(DBG_ERROR_PRIO,"Port data ptr doesnt exist. ctrl port id=0x%x port state = 0x%x",control_port_id, port_state);
+               AR_MSG_ISLAND(DBG_ERROR_PRIO,"Port data ptr doesnt exist. ctrl port id=0x%x port state = 0x%x",control_port_id, port_state);
          	}
 
          	if (0 != control_port_id) {
-            		if (CTRL_PORT_PEER_CONNECTED == port_state)
-            		{
-               		// Get one time buf from the queue
-               		result |= capi_cmn_imcl_get_one_time_buf(&me_ptr->cb_info, control_port_id, buf.actual_data_len, &buf);
-      
-               		AR_MSG_ISLAND(DBG_ERROR_PRIO,"buf.actual_data_len=0x%x", buf.actual_data_len);
-
-               		if (CAPI_FAILED(result) || NULL == buf.data_ptr)
-               		{
-                  			AR_MSG(DBG_ERROR_PRIO,"Getting one time buffer failed");
-                  			return result;
-               		}
-               		gain_imcl_header_t *out_cfg_ptr = (gain_imcl_header_t *)buf.data_ptr;
-               		capi_gain_coeff_arr_payload_t *data_over_imc_payload = (capi_gain_coeff_arr_payload_t*)(out_cfg_ptr + 1);
-
-               		out_cfg_ptr->opcode = PARAM_ID_GAIN_COEFF_IMC_PAYLOAD;
-               		out_cfg_ptr->actual_data_len = sizeof(capi_gain_coeff_arr_payload_t);
-               		memcpy(data_over_imc_payload->coeff_val, me_ptr->coeff_val, sizeof(me_ptr->coeff_val));
-               		// send data to peer/destination module
-               		if (CAPI_SUCCEEDED(capi_cmn_imcl_send_to_peer(&me_ptr->cb_info, &buf, control_port_id, flags)))
-               		{
-                  			//AR_MSG(DBG_HIGH_PRIO,"Enable %d and factor %d sent to control port 0x%x", data_over_imc_payload->coeff_val[0], control_port_id);
-               		}
-            		}
-            		else
-            		{
-               		AR_MSG(DBG_ERROR_PRIO,"Control port is not connected");
-            		}              
+               if (CTRL_PORT_PEER_CONNECTED == port_state)
+               {
+                  // Get one time buf from the queue
+                  result |= capi_cmn_imcl_get_one_time_buf(&me_ptr->cb_info, control_port_id, buf.actual_data_len, &buf);
+			      
+                  AR_MSG_ISLAND(DBG_ERROR_PRIO,"buf.actual_data_len=0x%x", buf.actual_data_len);
+			      
+                  if (CAPI_FAILED(result) || NULL == buf.data_ptr)
+                  {
+                     AR_MSG(DBG_ERROR_PRIO,"Getting one time buffer failed");
+                     return result;
+                  }
+                  gain_imcl_header_t *out_cfg_ptr = (gain_imcl_header_t *)buf.data_ptr;
+                  capi_gain_coeff_arr_payload_t *data_over_imc_payload = (capi_gain_coeff_arr_payload_t*)(out_cfg_ptr + 1);
+			      
+                  out_cfg_ptr->opcode = PARAM_ID_GAIN_COEFF_IMC_PAYLOAD;
+                  out_cfg_ptr->actual_data_len = sizeof(capi_gain_coeff_arr_payload_t);
+                  memcpy(data_over_imc_payload->coeff_val, me_ptr->coeff_val, sizeof(me_ptr->coeff_val));
+                  // send data to peer/destination module
+                  if (CAPI_SUCCEEDED(capi_cmn_imcl_send_to_peer(&me_ptr->cb_info, &buf, control_port_id, flags)))
+                  {
+                      //AR_MSG(DBG_HIGH_PRIO,"Enable %d and factor %d sent to control port 0x%x", data_over_imc_payload->coeff_val[0], control_port_id);
+                  }
+               }
+               else
+               {
+                  AR_MSG(DBG_ERROR_PRIO,"Control port is not connected");
+               }              
          	}
          	else {
-			AR_MSG(DBG_ERROR_PRIO,"Control port id is not proper");
-	 	}
-            	/////////////////////////// IMCL ends here            	           
+			   AR_MSG(DBG_ERROR_PRIO,"Control port id is not proper");
+	 	    }
+            /////////////////////////// IMCL ends here            	           
          }
          else
          {
@@ -428,22 +433,21 @@ static capi_err_t capi_control_tx_set_param(capi_t *                _pif,
          break;
       }
       
-      case INTF_EXTN_PARAM_ID_IMCL_PORT_OPERATION:
+      case PARAM_ID_GAIN_MODULE_MUTE:
       {
-         uint32_t supported_intent[1] = {INTENT_ID_GAIN_CONTROL};
-         capi_result = capi_cmn_ctrl_port_operation_handler(
-            &me_ptr->ctrl_port_info, params_ptr, 
-            (POSAL_HEAP_ID)me_ptr->heap_info.heap_id, 0, 1, supported_intent);
-
-#if 0
-               ///////////// Calling IMCL stuff here
-               
-               capi_err_t result = CAPI_EOK;
-         	capi_buf_t buf;
-         	uint32_t control_port_id = 0;
-         	imcl_port_state_t port_state = CTRL_PORT_CLOSE;
-   
-         	buf.actual_data_len = sizeof(gain_imcl_header_t) + sizeof(capi_gain_control_data_payload_t);
+         AR_MSG(DBG_HIGH_PRIO, "CAPI CONTROL: PARAM_ID_GAIN_MODULE_MUTE entered");
+         if (params_ptr->actual_data_len >= sizeof(control_tx_mute_t))
+         {
+		    control_tx_mute_t *cfg_ptr = (control_tx_mute_t *)(params_ptr->data_ptr);
+		    me_ptr->mute = cfg_ptr->mute;
+			
+		    ///////////// Calling IMCL stuff here
+              
+		    capi_err_t result = CAPI_EOK;
+		    capi_buf_t buf;
+		    uint32_t control_port_id = 0;
+		    imcl_port_state_t port_state = CTRL_PORT_CLOSE;
+   		    buf.actual_data_len = sizeof(gain_imcl_header_t) + sizeof(capi_gain_mute_payload_t);
          	buf.data_ptr = NULL;
          	buf.max_data_len = 0;
 
@@ -459,54 +463,222 @@ static capi_err_t capi_control_tx_set_param(capi_t *                _pif,
 
          	if (me_ptr->ctrl_port_ptr)
          	{
-            		control_port_id = me_ptr->ctrl_port_ptr->port_info.port_id;
-            		port_state = me_ptr->ctrl_port_ptr->state;
+               control_port_id = me_ptr->ctrl_port_ptr->port_info.port_id;
+               port_state = me_ptr->ctrl_port_ptr->state;
          	}
          	else
          	{
-            		AR_MSG_ISLAND(DBG_ERROR_PRIO,"Port data ptr doesnt exist. ctrl port id=0x%x port state = 0x%x",control_port_id, port_state);
+               AR_MSG_ISLAND(DBG_ERROR_PRIO,"Port data ptr doesnt exist. ctrl port id=0x%x port state = 0x%x",control_port_id, port_state);
          	}
 
          	if (0 != control_port_id) {
-            		me_ptr->is_ctrl_port_received = GAIN_CTRL_PORT_INFO_RCVD;
-            		if (CTRL_PORT_PEER_CONNECTED == port_state)
-            		{
-               		// Get one time buf from the queue
-               		result |= capi_cmn_imcl_get_one_time_buf(&me_ptr->cb_info, control_port_id, buf.actual_data_len, &buf);
-      
-               		AR_MSG_ISLAND(DBG_ERROR_PRIO,"buf.actual_data_len=0x%x", buf.actual_data_len);
+               if (CTRL_PORT_PEER_CONNECTED == port_state)
+               {
+                  /***** Send mute parameter here *****/
+                  unsigned long long func_start_time = HAP_perf_get_time_us();
+                  AR_MSG(DBG_HIGH_PRIO,"CAPI CONTROL: func_start_time = %lluus\n", func_start_time);
+                  	            			
+                  // Get one time buf from the queue
+                  result |= capi_cmn_imcl_get_one_time_buf(&me_ptr->cb_info, control_port_id, buf.actual_data_len, &buf);
+			      
+                  AR_MSG_ISLAND(DBG_ERROR_PRIO,"buf.actual_data_len=0x%x", buf.actual_data_len);
+			      
+                  if (CAPI_FAILED(result) || NULL == buf.data_ptr)
+                  {
+                     AR_MSG(DBG_ERROR_PRIO,"Getting one time buffer failed");
+                     return result;
+                  }
+                  gain_imcl_header_t *out_cfg_ptr = (gain_imcl_header_t *)buf.data_ptr;
+                  control_tx_mute_t *data_over_imc_payload = (control_tx_mute_t*)(out_cfg_ptr + 1);
+			      
+                  out_cfg_ptr->opcode = PARAM_ID_MUTE_IMC_PAYLOAD;
+                  out_cfg_ptr->actual_data_len = sizeof(capi_gain_mute_payload_t);
+                  data_over_imc_payload->mute = me_ptr->mute;
+                  // send data to peer/destination module
+                  unsigned long long func_start_send_mute_time = HAP_perf_get_time_us();
+                  AR_MSG(DBG_HIGH_PRIO,"CAPI CONTROL: func_start_send_mute_time = %lluus\n", func_start_send_mute_time);
+                  	
+                  if (CAPI_SUCCEEDED(capi_cmn_imcl_send_to_peer(&me_ptr->cb_info, &buf, control_port_id, flags)))
+                  {
+                     //AR_MSG(DBG_HIGH_PRIO,"Enable %d and factor %d sent to control port 0x%x", data_over_imc_payload->mute, control_port_id);
+                  }
+                  unsigned long long func_end_mute_time = HAP_perf_get_time_us();
+                  AR_MSG(DBG_HIGH_PRIO,"CAPI CONTROL: func_end_mute_time = %lluus\n", func_end_mute_time);
+			      
+                  /***** Send coeffs here *****/
+               	
+                  if (data_over_imc_payload->mute == 1) {
+				     capi_buf_t buf2;            			
+            		 buf2.actual_data_len = sizeof(gain_imcl_header_t) + sizeof(capi_gain_coeff_arr_payload_t);
+				     buf2.data_ptr = NULL;
+				     buf2.max_data_len = 0;
+               		 // Get one time buf from the queue
+               		 result |= capi_cmn_imcl_get_one_time_buf(&me_ptr->cb_info, control_port_id, buf2.actual_data_len, &buf2);
+					 
+               		 AR_MSG_ISLAND(DBG_ERROR_PRIO,"buf2.actual_data_len=0x%x", buf2.actual_data_len);
+					 
+               		 if (CAPI_FAILED(result) || NULL == buf2.data_ptr)
+               		 {
+                  	    AR_MSG(DBG_ERROR_PRIO,"Getting one time buffer failed");
+                  	    return result;
+               		 }
+               		 out_cfg_ptr = (gain_imcl_header_t *)buf2.data_ptr;
+               		 capi_gain_coeff_arr_payload_t *data_over_imc_payload_2 = (capi_gain_coeff_arr_payload_t*)(out_cfg_ptr + 1);
+					 
+               		 out_cfg_ptr->opcode = PARAM_ID_GAIN_COEFF_IMC_PAYLOAD;
+               		 out_cfg_ptr->actual_data_len = sizeof(capi_gain_coeff_arr_payload_t);
+            		 	
+            		 unsigned long long tx_start_send_coeff_time = HAP_perf_get_time_us();
+             		 AR_MSG(DBG_HIGH_PRIO,"CAPI CONTROL: tx_start_send_coeff_time = %lluus\n", tx_start_send_coeff_time);
+               	     // send data to peer/destination module
+	               	 memset(data_over_imc_payload_2->coeff_val, 0x7F, sizeof(me_ptr->coeff_val));
+               		 if (CAPI_SUCCEEDED(capi_cmn_imcl_send_to_peer(&me_ptr->cb_info, &buf2, control_port_id, flags)))
+               		 {
+               		 	// do nothing
+               		 }
 
-               		if (CAPI_FAILED(result) || NULL == buf.data_ptr)
-               		{
-                  			AR_MSG(DBG_ERROR_PRIO,"Getting one time buffer failed");
-                  			return result;
-               		}
-               		gain_imcl_header_t *out_cfg_ptr = (gain_imcl_header_t *)buf.data_ptr;
-               		capi_gain_control_data_payload_t *data_over_imc_payload = (capi_gain_control_data_payload_t*)(out_cfg_ptr + 1);
+#if 0
+               		 for (int count = 0; count < 175; count++) {
+	               	 	memset(data_over_imc_payload_2->coeff_val, count, sizeof(me_ptr->coeff_val));
+               		 	// send data to peer/destination module
+               		 	if (CAPI_SUCCEEDED(capi_cmn_imcl_send_to_peer(&me_ptr->cb_info, &buf2, control_port_id, flags)))
+               		 	{
+                  	 		   // do nothing
+               		 	}
+               		 }
+#endif
 
-               		out_cfg_ptr->opcode = PARAM_ID_GAIN_CONTROL_IMC_PAYLOAD;
-               		out_cfg_ptr->actual_data_len = sizeof(capi_gain_control_data_payload_t);
-               		data_over_imc_payload->gain = me_ptr->gain_config.gain_q13;
-               		// send data to peer/destination module
-               		if (CAPI_SUCCEEDED(capi_cmn_imcl_send_to_peer(&me_ptr->cb_info, &buf, control_port_id, flags)))
-               		{
-                  			AR_MSG(DBG_HIGH_PRIO,"Enable %d and dec factor %d sent to control port 0x%x", data_over_imc_payload->gain, control_port_id);
-               		}
-            		}
-            		else
-            		{
-               		AR_MSG(DBG_ERROR_PRIO,"Control port is not connected");
-            		}              
+            		 unsigned long long func_end_coeff_time = HAP_perf_get_time_us();
+            		 AR_MSG(DBG_HIGH_PRIO,"CAPI CONTROL: tx_end_coeff_time = %lluus\n", func_end_coeff_time);
+                  }
+
+#if 0
+            	  unsigned long long func_coeff_time = HAP_perf_get_time_us();
+
+				  /***** Togle mute param and send it again TODO:fix this ****/
+				  capi_buf_t buf3;            			
+            	  buf3.actual_data_len = sizeof(gain_imcl_header_t) + sizeof(capi_gain_mute_payload_t);
+				  buf3.data_ptr = NULL;
+				  buf3.max_data_len = 0;
+               	  if (CAPI_FAILED(result) || NULL == buf3.data_ptr)
+               	  {
+                     AR_MSG_ISLAND(DBG_ERROR_PRIO,"Getting one time buffer failed");
+                     return result;
+               	  }
+               	  out_cfg_ptr = (gain_imcl_header_t *)buf3.data_ptr;
+               	  control_tx_mute_t *data_over_imc_payload_3 = (control_tx_mute_t*)(out_cfg_ptr + 1);
+               	  
+               	  out_cfg_ptr->opcode = PARAM_ID_MUTE_IMC_PAYLOAD;
+               	  out_cfg_ptr->actual_data_len = sizeof(capi_gain_mute_payload_t);
+               	  if (data_over_imc_payload->mute == 1) {
+               	  	data_over_imc_payload_3->mute = 0;
+               	  } else if (data_over_imc_payload->mute == 0) {
+               	  	data_over_imc_payload_3->mute = 1;
+               	  }
+               	  // send data to peer/destination module
+               	  if (CAPI_SUCCEEDED(capi_cmn_imcl_send_to_peer(&me_ptr->cb_info, &buf3, control_port_id, flags)))
+               	  {
+                     //AR_MSG(DBG_HIGH_PRIO,"Enable %d and factor %d sent to control port 0x%x", data_over_imc_payload->mute, control_port_id);
+               	  }
+                  unsigned long long func_end_time = HAP_perf_get_time_us();
+                  AR_MSG(DBG_HIGH_PRIO,"CAPI CONTROL: func_end_time = %lluus\n", func_end_time);
+#endif
+               }
+               else
+               {
+                  AR_MSG(DBG_ERROR_PRIO,"Control port is not connected");
+               }              
          	}
          	else {
-			AR_MSG(DBG_ERROR_PRIO,"Control port id is not proper");
-	 	}
-            	/////////////////////////// IMCL ends here     
+			   AR_MSG(DBG_ERROR_PRIO,"Control port id is not proper");
+	 	    }
+            /////////////////////////// IMCL ends here            	           
+         }
+         else
+         {
+            AR_MSG(DBG_ERROR_PRIO, "CAPI CONTROL: <<set_param>> Bad param size %lu", params_ptr->actual_data_len);
+            return CAPI_ENEEDMORE;
+         }
+         break;
+      }
+
+      case INTF_EXTN_PARAM_ID_IMCL_PORT_OPERATION:
+      {
+         uint32_t supported_intent[1] = {INTENT_ID_GAIN_CONTROL};
+         capi_result = capi_cmn_ctrl_port_operation_handler(
+            &me_ptr->ctrl_port_info, params_ptr, 
+            (POSAL_HEAP_ID)me_ptr->heap_info.heap_id, 0, 1, supported_intent);
+
+#if 0
+         ///////////// Calling IMCL stuff here
+               
+         capi_err_t result = CAPI_EOK;
+         capi_buf_t buf;
+         uint32_t control_port_id = 0;
+         imcl_port_state_t port_state = CTRL_PORT_CLOSE;
+		   
+         buf.actual_data_len = sizeof(gain_imcl_header_t) + sizeof(capi_gain_control_data_payload_t);
+         buf.data_ptr = NULL;
+         buf.max_data_len = 0;
+
+         imcl_outgoing_data_flag_t flags;
+         flags.should_send = TRUE;
+         flags.is_trigger = FALSE;
+
+         // Get the first control port id for the intent #INTENT_ID_GAIN_CONTROL
+         capi_cmn_ctrl_port_list_get_next_port_data(&me_ptr->ctrl_port_info,
+                                             INTENT_ID_GAIN_CONTROL,
+                                             control_port_id, // initially, an invalid port id
+                                             &me_ptr->ctrl_port_ptr);
+		   
+         if (me_ptr->ctrl_port_ptr)
+         {
+            control_port_id = me_ptr->ctrl_port_ptr->port_info.port_id;
+            port_state = me_ptr->ctrl_port_ptr->state;
+         }
+         else
+         {
+            AR_MSG_ISLAND(DBG_ERROR_PRIO,"Port data ptr doesnt exist. ctrl port id=0x%x port state = 0x%x",control_port_id, port_state);
+         }
+		   
+         if (0 != control_port_id) {
+            me_ptr->is_ctrl_port_received = GAIN_CTRL_PORT_INFO_RCVD;
+            if (CTRL_PORT_PEER_CONNECTED == port_state)
+            {
+               // Get one time buf from the queue
+               result |= capi_cmn_imcl_get_one_time_buf(&me_ptr->cb_info, control_port_id, buf.actual_data_len, &buf);
+			   
+               AR_MSG_ISLAND(DBG_ERROR_PRIO,"buf.actual_data_len=0x%x", buf.actual_data_len);
+			   
+               if (CAPI_FAILED(result) || NULL == buf.data_ptr)
+               {
+                  AR_MSG(DBG_ERROR_PRIO,"Getting one time buffer failed");
+                  return result;
+               }
+               gain_imcl_header_t *out_cfg_ptr = (gain_imcl_header_t *)buf.data_ptr;
+               capi_gain_control_data_payload_t *data_over_imc_payload = (capi_gain_control_data_payload_t*)(out_cfg_ptr + 1);
+			   
+               out_cfg_ptr->opcode = PARAM_ID_GAIN_CONTROL_IMC_PAYLOAD;
+               out_cfg_ptr->actual_data_len = sizeof(capi_gain_control_data_payload_t);
+               data_over_imc_payload->gain = me_ptr->gain_config.gain_q13;
+               // send data to peer/destination module
+               if (CAPI_SUCCEEDED(capi_cmn_imcl_send_to_peer(&me_ptr->cb_info, &buf, control_port_id, flags)))
+               {
+                  AR_MSG(DBG_HIGH_PRIO,"Enable %d and dec factor %d sent to control port 0x%x", data_over_imc_payload->gain, control_port_id);
+               }
+            }
+            else
+            {
+               AR_MSG(DBG_ERROR_PRIO,"Control port is not connected");
+            }              
+         }
+         else {
+	        AR_MSG(DBG_ERROR_PRIO,"Control port id is not proper");
+	 	 }
+         /////////////////////////// IMCL ends here     
 #endif       	
          break;
-
       }
-      
       
       default:
       {
@@ -544,16 +716,16 @@ static capi_err_t capi_control_tx_get_param(capi_t *                _pif,
 
    switch (param_id)
    {
-      case PARAM_ID_MODULE_ENABLE:
+      case PARAM_MOD_CONTROL_ENABLE:
       {
          AR_MSG(DBG_HIGH_PRIO, "CAPI CONTROL: GET PARAM");
-         if (params_ptr->max_data_len >= sizeof(param_id_module_enable_t))
+         if (params_ptr->max_data_len >= sizeof(control_module_enable_t))
          {
-            param_id_module_enable_t *enable_ptr = (param_id_module_enable_t *)(params_ptr->data_ptr);
+            control_module_enable_t *enable_ptr = (control_module_enable_t *)(params_ptr->data_ptr);
             enable_ptr->enable                   = me_ptr->gain_config.enable;
 
             /* Populate actual data length*/
-            params_ptr->actual_data_len = (uint32_t)sizeof(param_id_module_enable_t);
+            params_ptr->actual_data_len = (uint32_t)sizeof(control_module_enable_t);
          }
          else
          {
@@ -584,21 +756,39 @@ static capi_err_t capi_control_tx_get_param(capi_t *                _pif,
       }
       case GAIN_PARAM_COEFF_ARR:
       {
-      	if (params_ptr->max_data_len >= sizeof(control_tx_coeff_arr_t))
-      	{
+         if (params_ptr->max_data_len >= sizeof(control_tx_coeff_arr_t))
+      	 {
 		    control_tx_coeff_arr_t *gain_cfg_ptr = (control_tx_coeff_arr_t *)(params_ptr->data_ptr);
 		    memcpy(gain_cfg_ptr->coeff_val, me_ptr->coeff_val, sizeof(me_ptr->coeff_val));
 		    params_ptr->actual_data_len    = sizeof(control_tx_coeff_arr_t);
-	    }
-	    else
-        {
+	     }
+	     else
+         {
             AR_MSG(DBG_ERROR_PRIO,
                    "CAPI CONTROL: <<get_param>> Bad param size %lu  Param id = %lu",
                    params_ptr->max_data_len,
                    param_id);
             return CAPI_ENEEDMORE;
-        }
-	break;
+         }
+	     break;
+      }
+      case PARAM_ID_GAIN_MODULE_MUTE:
+      {
+      	 if (params_ptr->max_data_len >= sizeof(control_tx_mute_t))
+      	 {
+		    control_tx_mute_t *cfg_ptr = (control_tx_mute_t *)(params_ptr->data_ptr);
+		    cfg_ptr->mute = me_ptr->mute;
+		    params_ptr->actual_data_len    = sizeof(control_tx_mute_t);
+	     }
+	     else
+         {
+            AR_MSG(DBG_ERROR_PRIO,
+                   "CAPI CONTROL: <<get_param>> Bad param size %lu  Param id = %lu",
+                   params_ptr->max_data_len,
+                   param_id);
+            return CAPI_ENEEDMORE;
+         }
+	     break;
       }
       default:
       {

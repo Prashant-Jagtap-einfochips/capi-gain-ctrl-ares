@@ -33,8 +33,8 @@
         </TOOL_POLICIES>
       </MODULE_INFO>
       <PARAMETER_LIST>
-        <PARAMETER name="PARAM_ID_MODULE_ENABLE" pid="0x8001026" maxSize="0x4" description="ID for the Enable parameter used by any audio processing module. This#[
-          #] generic/common parameter is used to configure or determine the state of any audio processing module.">
+        <PARAMETER name="PARAM_MOD_CONTROL_ENABLE" pid="0x8001020" maxSize="0x4" description="ID for the Enable parameter used by any audio processing module.#[
+          #] This generic/common parameter is used to configure or determine the state of any audio processing module.">
           <TOOL_POLICIES>
             <POLICY name="CALIBRATION"/>
             <POLICY name="RTC"/>
@@ -72,6 +72,20 @@
           <DEFAULT_DEPENDENCIES/>
           <CONFIG_ELEMENT name="coeff_val" type="unsigned char" typeUnSigned="true" byteSize="0x1" byteOffset="0x0" arrayElements="4096" min="0x0" max="0xff"
             default="0x0" description="Coefficient values" policy="BASIC"/>
+        </PARAMETER>
+        <PARAMETER name="PARAM_ID_GAIN_MODULE_MUTE" pid="0x8001230" maxSize="0x4" description="parameter used to send the mute to RX from the control module.">
+          <TOOL_POLICIES>
+            <POLICY name="RTC"/>
+            <POLICY name="CALIBRATION"/>
+          </TOOL_POLICIES>
+          <DEFAULT_DEPENDENCIES/>
+          <CONFIG_ELEMENT name="mute" type="unsigned int" typeUnSigned="true" byteSize="0x4" byteOffset="0x0" min="0x0" max="0xffffffff" default="0x0"
+            description="Mute parameter" policy="BASIC">
+            <RANGE_LIST>
+              <RANGE name="Disable" value="0x0"/>
+              <RANGE name="Enable" value="0x1"/>
+            </RANGE_LIST>
+          </CONFIG_ELEMENT>
         </PARAMETER>
       </PARAMETER_LIST>
     </MODULE>

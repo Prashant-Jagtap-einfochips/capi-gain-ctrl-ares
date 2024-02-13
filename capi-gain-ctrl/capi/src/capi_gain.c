@@ -29,6 +29,7 @@
 #include "capi_cmn_ctrl_port_list.h"
 #include "imcl_gain_api.h"
 
+#include "HAP_perf.h"
 
 // todo: try multichannel test cases (maybe 16 channels. It should work fine.)
 
@@ -122,6 +123,12 @@ capi_err_t capi_gain_init(capi_t *_pif, capi_proplist_t *init_set_properties)
    me_ptr->gain_config.gain_q12 = apply_gain >> 1;
    me_ptr->gain_config.gain_q13 = apply_gain;
 
+   /* Disable mute parameter by default */
+   me_ptr->mute = 0;
+   
+   // Disable the module by default
+   me_ptr->gain_config.enable = 0;
+   
    if (NULL != init_set_properties)
    {
       capi_result = capi_gain_process_set_properties(me_ptr, init_set_properties);
@@ -167,40 +174,82 @@ static capi_err_t capi_gain_process(capi_t *_pif, capi_stream_data_t *input[], c
    /* Samples to process is the minimum of the input and output lengths available*/
    samples_to_process = (inp_samples < out_samples) ? inp_samples : out_samples;
 
-   for (uint32_t ch = 0; ch < me_ptr->operating_media_fmt.format.num_channels; ch++)
-   {
-      if (BIT_WIDTH_16 == me_ptr->operating_media_fmt.format.bits_per_sample)
+   if (me_ptr->gain_config.enable) {
+      for (uint32_t ch = 0; ch < me_ptr->operating_media_fmt.format.num_channels; ch++)
       {
-         example_apply_gain_16((int16_t *)output[0]->buf_ptr[ch].data_ptr,
-                               (int16_t *)input[0]->buf_ptr[ch].data_ptr,
-                               me_ptr->gain_config.gain_q12,
-                               samples_to_process);
-         output[0]->buf_ptr[ch].actual_data_len = samples_to_process << 1;
-         input[0]->buf_ptr[ch].actual_data_len  = samples_to_process << 1;
-      }
-      else
-      {
-         if ((uint16_t)(me_ptr->gain_config.gain_q12 >> 12) > 0)
+         if (BIT_WIDTH_16 == me_ptr->operating_media_fmt.format.bits_per_sample)
          {
-            // for gain greater than 1
-            example_apply_gain_32_G1((int32_t *)output[0]->buf_ptr[ch].data_ptr,
-                                     (int32_t *)input[0]->buf_ptr[ch].data_ptr,
-                                     me_ptr->gain_config.gain_q12,
-                                     samples_to_process,
-                                     me_ptr->operating_media_fmt.format.q_factor);
+         	 if (!me_ptr->mute) {
+               example_apply_gain_16((int16_t *)output[0]->buf_ptr[ch].data_ptr,
+                                  (int16_t *)input[0]->buf_ptr[ch].data_ptr,
+                                  me_ptr->gain_config.gain_q12,
+                                  samples_to_process);
+	        }
+	        else {
+               example_apply_gain_16((int16_t *)output[0]->buf_ptr[ch].data_ptr,
+                                  (int16_t *)input[0]->buf_ptr[ch].data_ptr,
+                                  0,
+                                  samples_to_process);	
+	        }
+            output[0]->buf_ptr[ch].actual_data_len = samples_to_process << 1;
+            input[0]->buf_ptr[ch].actual_data_len  = samples_to_process << 1;
          }
          else
          {
-            // for gain less than 1
-            example_apply_gain_32_L1((int32_t *)output[0]->buf_ptr[ch].data_ptr,
-                                     (int32_t *)input[0]->buf_ptr[ch].data_ptr,
-                                     me_ptr->gain_config.gain_q12,
-                                     samples_to_process,
-                                     me_ptr->operating_media_fmt.format.q_factor);
+            if ((uint16_t)(me_ptr->gain_config.gain_q12 >> 12) > 0)
+            {
+               // for gain greater than 1
+               if (!me_ptr->mute) {
+               example_apply_gain_32_G1((int32_t *)output[0]->buf_ptr[ch].data_ptr,
+                                        (int32_t *)input[0]->buf_ptr[ch].data_ptr,
+                                        me_ptr->gain_config.gain_q12,
+                                        samples_to_process,
+                                        me_ptr->operating_media_fmt.format.q_factor);
+               }
+               else {
+               example_apply_gain_32_G1((int32_t *)output[0]->buf_ptr[ch].data_ptr,
+                                        (int32_t *)input[0]->buf_ptr[ch].data_ptr,
+                                        0,
+                                        samples_to_process,
+                                        me_ptr->operating_media_fmt.format.q_factor);
+               }
+            }
+            else
+            {
+               // for gain less than 1
+               if (!me_ptr->mute) {
+               example_apply_gain_32_L1((int32_t *)output[0]->buf_ptr[ch].data_ptr,
+                                        (int32_t *)input[0]->buf_ptr[ch].data_ptr,
+                                        me_ptr->gain_config.gain_q12,
+                                        samples_to_process,
+                                        me_ptr->operating_media_fmt.format.q_factor);
+               }
+               else {
+               example_apply_gain_32_L1((int32_t *)output[0]->buf_ptr[ch].data_ptr,
+                                        (int32_t *)input[0]->buf_ptr[ch].data_ptr,
+                                        0,
+                                        samples_to_process,
+                                        me_ptr->operating_media_fmt.format.q_factor);            
+               }
+            }
+            output[0]->buf_ptr[ch].actual_data_len = samples_to_process << 2;
+            input[0]->buf_ptr[ch].actual_data_len  = samples_to_process << 2;
          }
-         output[0]->buf_ptr[ch].actual_data_len = samples_to_process << 2;
-         input[0]->buf_ptr[ch].actual_data_len  = samples_to_process << 2;
       }
+   }
+   else {
+      // Module disabled, copy input to output
+      memcpy(output[0]->buf_ptr[0].data_ptr, input[0]->buf_ptr[0].data_ptr, input[0]->buf_ptr->actual_data_len);
+      if (2 == output[0]->bufs_num)
+      {
+         memcpy(output[0]->buf_ptr[1].data_ptr, input[0]->buf_ptr[1].data_ptr, input[0]->buf_ptr->actual_data_len);
+      }
+      // Update actual data length for output buffer
+      output[0]->buf_ptr[0].actual_data_len = input[0]->buf_ptr->actual_data_len;
+      if (2 == output[0]->bufs_num)
+      {
+         output[0]->buf_ptr[1].actual_data_len = input[0]->buf_ptr->actual_data_len;
+      }   
    }
 
    if (samples_to_process)
@@ -340,10 +389,25 @@ static capi_err_t capi_gain_set_param(capi_t *                _pif,
          }
          break;
       }
+      
+      case PARAM_ID_GAIN_MODULE_MUTE:
+      {
+         if (params_ptr->actual_data_len >= sizeof(control_tx_mute_t))
+         {
+            control_tx_mute_t *cfg_ptr = (control_tx_mute_t *)(params_ptr->data_ptr);
+            me_ptr->mute = cfg_ptr->mute;
+         }
+         else
+         {
+            AR_MSG(DBG_ERROR_PRIO, "CAPI GAIN: <<set_param>> Bad param size %lu", params_ptr->actual_data_len);
+            return CAPI_ENEEDMORE;
+         }
+         break;
+      }
 	  
       case INTF_EXTN_PARAM_ID_IMCL_PORT_OPERATION:
       {
-	 AR_MSG(DBG_ERROR_PRIO,"IMC port operation handler here\n");
+	     AR_MSG(DBG_ERROR_PRIO,"IMC port operation handler here\n");
 
          uint32_t supported_intent[1] = {INTENT_ID_GAIN_CONTROL};
          capi_result = capi_cmn_ctrl_port_operation_handler(
@@ -351,20 +415,20 @@ static capi_err_t capi_gain_set_param(capi_t *                _pif,
             (POSAL_HEAP_ID)me_ptr->heap_info.heap_id, 0, 1, supported_intent);
          break;
       }
-      
+	  
       case INTF_EXTN_PARAM_ID_IMCL_INCOMING_DATA:
       {
-          #ifdef US_GEN_DEBUG_LOG
-	   AR_MSG(DBG_LOW_PRIO,"Inside INTF_EXTN_PARAM_ID_IMCL_INCOMING_DATA.");
-	   #endif
-	    //this function will receive the sampling frequency sent over imc by us detect
-	    capi_result = GainRx_imc_set_param_handler(me_ptr, params_ptr);
-            if (CAPI_EOK != capi_result)
-	    {
-		AR_MSG(DBG_ERROR_PRIO,"IMC set param handler failed 0x%x\n",param_id);
-	    }
-	    break;
-	}
+#ifdef US_GEN_DEBUG_LOG
+	     AR_MSG(DBG_LOW_PRIO,"Inside INTF_EXTN_PARAM_ID_IMCL_INCOMING_DATA.");
+#endif
+	     //this function will receive the sampling frequency sent over imc by us detect
+	     capi_result = GainRx_imc_set_param_handler(me_ptr, params_ptr);
+         if (CAPI_EOK != capi_result)
+	     {
+		    AR_MSG(DBG_ERROR_PRIO,"IMC set param handler failed 0x%x\n",param_id);
+	     }
+	     break;
+	  }
       default:
       {
          AR_MSG(DBG_ERROR_PRIO, "CAPI GAIN: Set, unsupported param ID 0x%x", (int)param_id);
@@ -458,7 +522,24 @@ static capi_err_t capi_gain_get_param(capi_t *                _pif,
          }
          break;
       }
-	  
+      case PARAM_ID_GAIN_MODULE_MUTE:
+      {
+         if (params_ptr->max_data_len >= sizeof(control_tx_mute_t))
+         {
+            control_tx_mute_t *cfg_ptr = (control_tx_mute_t *)(params_ptr->data_ptr);
+            cfg_ptr->mute = me_ptr->mute;
+            params_ptr->actual_data_len    = sizeof(control_tx_mute_t);
+         }
+         else
+         {
+            AR_MSG(DBG_ERROR_PRIO,
+                   "CAPI GAIN: <<get_param>> Bad param size %lu  Param id = %lu",
+                   params_ptr->max_data_len,
+                   param_id);
+            return CAPI_ENEEDMORE;
+         }
+         break;
+      }	  
       default:
       {
          AR_MSG(DBG_ERROR_PRIO, "CAPI GAIN: Get, unsupported param ID 0x%x", param_id);
@@ -551,16 +632,14 @@ capi_err_t GainRx_imc_set_param_handler (capi_gain_t * me_ptr, capi_buf_t * inte
                      //capi_gain_raise_event(me_ptr);
                      
                      
-                     uint32_t enable = TRUE;
-
+                  uint32_t enable = TRUE;
 #if 0
-            	     if (Q13_UNITY_GAIN == me_ptr->gain_config.gain_q12 << 1)
-            	     {
-               	enable = FALSE;
-            	     }
-           	     enable = enable && ((me_ptr->gain_config.enable == 0) ? 0 : 1);
+                  if (Q13_UNITY_GAIN == me_ptr->gain_config.gain_q12 << 1){
+               	     enable = FALSE;
+            	  }
+           	      enable = enable && ((me_ptr->gain_config.enable == 0) ? 0 : 1);
 #endif
-                    result |= capi_gain_raise_process_event(me_ptr, enable);
+                  result |= capi_gain_raise_process_event(me_ptr, enable);
                }
                else
                {
@@ -578,8 +657,6 @@ capi_err_t GainRx_imc_set_param_handler (capi_gain_t * me_ptr, capi_buf_t * inte
                return CAPI_EUNSUPPORTED;
             }
 #endif
-
-
             break;
          }
 
@@ -594,9 +671,30 @@ capi_err_t GainRx_imc_set_param_handler (capi_gain_t * me_ptr, capi_buf_t * inte
             capi_gain_coeff_arr_payload_t *cfg_ptr = (capi_gain_coeff_arr_payload_t *) payload_ptr;
             memcpy(me_ptr->coeff_val, cfg_ptr->coeff_val, sizeof(cfg_ptr->coeff_val));
 
+            unsigned long long rx_coeff_receive_time = HAP_perf_get_time_us();
+            AR_MSG(DBG_HIGH_PRIO,"CAPI GAIN: rx_coeff_receive_time = %lluus\n", rx_coeff_receive_time); 
+                            
             break;
          }
          
+         case PARAM_ID_MUTE_IMC_PAYLOAD:
+         {
+            if (header_ptr->actual_data_len < sizeof(capi_gain_mute_payload_t))
+            {
+               AR_MSG(DBG_ERROR_PRIO,"IMC Param id 0x%lx Invalid payload size for incoming data %d",header_ptr->opcode, header_ptr->actual_data_len);
+               return CAPI_ENEEDMORE;
+            }
+            
+            capi_gain_mute_payload_t *cfg_ptr = (capi_gain_mute_payload_t *) payload_ptr;
+            // set mute param
+            me_ptr->mute = cfg_ptr->mute;
+
+            unsigned long long rx_mute_receive_time = HAP_perf_get_time_us();
+            AR_MSG(DBG_HIGH_PRIO,"CAPI GAIN: rx_mute_receive_time = %lluus\n", rx_mute_receive_time);
+
+            break;
+         }
+
          default:
          {
             AR_MSG(DBG_ERROR_PRIO,"Unsupported opcode for incoming data over IMCL %d", header_ptr->opcode);

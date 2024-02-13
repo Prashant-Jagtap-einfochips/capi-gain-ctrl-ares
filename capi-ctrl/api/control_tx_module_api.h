@@ -82,6 +82,38 @@
 /*==============================================================================
    API definitions
 ==============================================================================*/
+
+#define PARAM_MOD_CONTROL_ENABLE 0x08001020
+
+/*# @h2xmlp_parameter   {"PARAM_MOD_CONTROL_ENABLE", PARAM_MOD_CONTROL_ENABLE}
+    @h2xmlp_description {ID for the Enable parameter used by any audio
+                         processing module. This generic/common parameter is
+                         used to configure or determine the state of any audio
+                         processing module.}
+    @h2xmlp_toolPolicy  {Calibration; RTC} */
+
+#include "spf_begin_pack.h"
+struct control_module_enable_t
+{
+   uint32_t enable;
+   /**< Specifies whether the module is to be enabled or disabled.
+
+        @valuesbul
+        - 0 -- Disable (Default)
+        - 1 -- Enable @tablebulletend */
+
+   /*#< @h2xmle_description {Specifies whether the module is to be enabled or
+                             disabled.}
+        @h2xmle_rangeList   {"Disable"=0;
+                             "Enable"=1}
+        @h2xmle_default     {0}
+        @h2xmle_policy      {Basic} */
+}
+#include "spf_end_pack.h"
+;
+typedef struct control_module_enable_t control_module_enable_t;
+
+
 /* ID of the parameter used to set the gain */
 #define PARAM_ID_GAIN_MODULE_GAIN 0x08001176
 
@@ -126,6 +158,29 @@ struct control_tx_coeff_arr_t
         @h2xmle_default     {0x00}
         @h2xmle_range       {0..0xFF}
         
+        @h2xmle_policy      {Basic} */
+}
+#include "spf_end_pack.h"
+;
+
+#define PARAM_ID_GAIN_MODULE_MUTE 0x08001230
+
+/* Structure definition for Parameter */
+typedef struct control_tx_mute_t control_tx_mute_t;
+
+/** @h2xmlp_parameter   {"PARAM_ID_GAIN_MODULE_MUTE",
+                         PARAM_ID_GAIN_MODULE_MUTE}
+    @h2xmlp_description {parameter used to send the mute to RX
+                         from the control module.} */
+#include "spf_begin_pack.h"
+
+struct control_tx_mute_t
+{
+   unsigned int mute;
+   /*#< @h2xmle_description {Mute parameter}
+        @h2xmle_rangeList   {"Disable"=0;
+                             "Enable"=1}
+        @h2xmle_default     {0}
         @h2xmle_policy      {Basic} */
 }
 #include "spf_end_pack.h"

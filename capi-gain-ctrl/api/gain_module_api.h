@@ -129,6 +129,29 @@ struct control_tx_coeff_arr_t
 }
 #include "spf_end_pack.h"
 ;
+
+#define PARAM_ID_GAIN_MODULE_MUTE 0x08001232
+
+/* Structure definition for Parameter */
+typedef struct control_tx_mute_t control_tx_mute_t;
+
+/** @h2xmlp_parameter   {"PARAM_ID_GAIN_MODULE_MUTE",
+                         PARAM_ID_GAIN_MODULE_MUTE}
+    @h2xmlp_description {parameter used to receive the mute
+                         from the control module.} */
+#include "spf_begin_pack.h"
+
+struct control_tx_mute_t
+{
+   unsigned int mute;
+   /*#< @h2xmle_description {Mute parameter}
+        @h2xmle_rangeList   {"Disable"=0;
+                             "Enable"=1}
+        @h2xmle_default     {0}
+        @h2xmle_policy      {Basic} */
+}
+#include "spf_end_pack.h"
+;
 /**  @}                   <-- End of the Module -->*/
 
 #endif //_GAIN_MODULE_API_H_
