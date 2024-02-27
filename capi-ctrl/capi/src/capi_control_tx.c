@@ -410,10 +410,14 @@ static capi_err_t capi_control_tx_set_param(capi_t *                _pif,
                   out_cfg_ptr->actual_data_len = sizeof(capi_gain_coeff_arr_payload_t);
                   memcpy(data_over_imc_payload->coeff_val, me_ptr->coeff_val, sizeof(me_ptr->coeff_val));
                   // send data to peer/destination module
+                  unsigned long long tx_start_send_coeff_time = HAP_perf_get_time_us();
+                  AR_MSG(DBG_HIGH_PRIO,"CAPI CONTROL: tx_start_send_coeff_time = %lluus\n", tx_start_send_coeff_time);
                   if (CAPI_SUCCEEDED(capi_cmn_imcl_send_to_peer(&me_ptr->cb_info, &buf, control_port_id, flags)))
                   {
                       //AR_MSG(DBG_HIGH_PRIO,"Enable %d and factor %d sent to control port 0x%x", data_over_imc_payload->coeff_val[0], control_port_id);
                   }
+                  unsigned long long tx_end_coeff_time = HAP_perf_get_time_us();
+                  AR_MSG(DBG_HIGH_PRIO,"CAPI CONTROL: tx_end_coeff_time = %lluus\n", tx_end_coeff_time);
                }
                else
                {
@@ -495,18 +499,18 @@ static capi_err_t capi_control_tx_set_param(capi_t *                _pif,
                   out_cfg_ptr->actual_data_len = sizeof(capi_gain_mute_payload_t);
                   data_over_imc_payload->mute = me_ptr->mute;
                   // send data to peer/destination module
-                  unsigned long long func_start_send_mute_time = HAP_perf_get_time_us();
-                  AR_MSG(DBG_HIGH_PRIO,"CAPI CONTROL: func_start_send_mute_time = %lluus\n", func_start_send_mute_time);
+                  unsigned long long tx_start_send_mute_time = HAP_perf_get_time_us();
+                  AR_MSG(DBG_HIGH_PRIO,"CAPI CONTROL: tx_start_send_mute_time = %lluus\n", tx_start_send_mute_time);
                   	
                   if (CAPI_SUCCEEDED(capi_cmn_imcl_send_to_peer(&me_ptr->cb_info, &buf, control_port_id, flags)))
                   {
                      //AR_MSG(DBG_HIGH_PRIO,"Enable %d and factor %d sent to control port 0x%x", data_over_imc_payload->mute, control_port_id);
                   }
-                  unsigned long long func_end_mute_time = HAP_perf_get_time_us();
-                  AR_MSG(DBG_HIGH_PRIO,"CAPI CONTROL: func_end_mute_time = %lluus\n", func_end_mute_time);
-			      
+                  unsigned long long tx_end_mute_time = HAP_perf_get_time_us();
+                  AR_MSG(DBG_HIGH_PRIO,"CAPI CONTROL: tx_end_mute_time = %lluus\n", tx_end_mute_time);
+
+#if 0
                   /***** Send coeffs here *****/
-               	
                   if (data_over_imc_payload->mute == 1) {
 				     capi_buf_t buf2;            			
             		 buf2.actual_data_len = sizeof(gain_imcl_header_t) + sizeof(capi_gain_coeff_arr_payload_t);
@@ -536,9 +540,7 @@ static capi_err_t capi_control_tx_set_param(capi_t *                _pif,
                		 {
                		 	// do nothing
                		 }
-
-#if 0
-               		 for (int count = 0; count < 175; count++) {
+             		 for (int count = 0; count < 175; count++) {
 	               	 	memset(data_over_imc_payload_2->coeff_val, count, sizeof(me_ptr->coeff_val));
                		 	// send data to peer/destination module
                		 	if (CAPI_SUCCEEDED(capi_cmn_imcl_send_to_peer(&me_ptr->cb_info, &buf2, control_port_id, flags)))
@@ -547,42 +549,8 @@ static capi_err_t capi_control_tx_set_param(capi_t *                _pif,
                		 	}
                		 }
 #endif
-
-            		 unsigned long long func_end_coeff_time = HAP_perf_get_time_us();
-            		 AR_MSG(DBG_HIGH_PRIO,"CAPI CONTROL: tx_end_coeff_time = %lluus\n", func_end_coeff_time);
-                  }
-
-#if 0
-            	  unsigned long long func_coeff_time = HAP_perf_get_time_us();
-
-				  /***** Togle mute param and send it again TODO:fix this ****/
-				  capi_buf_t buf3;            			
-            	  buf3.actual_data_len = sizeof(gain_imcl_header_t) + sizeof(capi_gain_mute_payload_t);
-				  buf3.data_ptr = NULL;
-				  buf3.max_data_len = 0;
-               	  if (CAPI_FAILED(result) || NULL == buf3.data_ptr)
-               	  {
-                     AR_MSG_ISLAND(DBG_ERROR_PRIO,"Getting one time buffer failed");
-                     return result;
-               	  }
-               	  out_cfg_ptr = (gain_imcl_header_t *)buf3.data_ptr;
-               	  control_tx_mute_t *data_over_imc_payload_3 = (control_tx_mute_t*)(out_cfg_ptr + 1);
-               	  
-               	  out_cfg_ptr->opcode = PARAM_ID_MUTE_IMC_PAYLOAD;
-               	  out_cfg_ptr->actual_data_len = sizeof(capi_gain_mute_payload_t);
-               	  if (data_over_imc_payload->mute == 1) {
-               	  	data_over_imc_payload_3->mute = 0;
-               	  } else if (data_over_imc_payload->mute == 0) {
-               	  	data_over_imc_payload_3->mute = 1;
-               	  }
-               	  // send data to peer/destination module
-               	  if (CAPI_SUCCEEDED(capi_cmn_imcl_send_to_peer(&me_ptr->cb_info, &buf3, control_port_id, flags)))
-               	  {
-                     //AR_MSG(DBG_HIGH_PRIO,"Enable %d and factor %d sent to control port 0x%x", data_over_imc_payload->mute, control_port_id);
-               	  }
-                  unsigned long long func_end_time = HAP_perf_get_time_us();
-                  AR_MSG(DBG_HIGH_PRIO,"CAPI CONTROL: func_end_time = %lluus\n", func_end_time);
-#endif
+                  unsigned long long func_end_coeff_time = HAP_perf_get_time_us();
+                  AR_MSG(DBG_HIGH_PRIO,"CAPI CONTROL: tx_end_coeff_time = %lluus\n", func_end_coeff_time);
                }
                else
                {
@@ -590,9 +558,9 @@ static capi_err_t capi_control_tx_set_param(capi_t *                _pif,
                }              
          	}
          	else {
-			   AR_MSG(DBG_ERROR_PRIO,"Control port id is not proper");
-	 	    }
-            /////////////////////////// IMCL ends here            	           
+		    AR_MSG(DBG_ERROR_PRIO,"Control port id is not proper");
+	        }
+                /////////////////////////// IMCL ends here            	           
          }
          else
          {

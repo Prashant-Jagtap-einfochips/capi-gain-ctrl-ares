@@ -63,14 +63,14 @@
             </RANGE_LIST>
           </CONFIG_ELEMENT>
         </PARAMETER>
-        <PARAMETER name="GAIN_PARAM_COEFF_ARR" pid="0x800122e" maxSize="0x1000" description="parameter used to send the coefficients to RX from the control#[
+        <PARAMETER name="GAIN_PARAM_COEFF_ARR" pid="0x800122e" maxSize="0x800" description="parameter used to send the coefficients to RX from the control#[
           #] module.">
           <TOOL_POLICIES>
             <POLICY name="RTC"/>
             <POLICY name="CALIBRATION"/>
           </TOOL_POLICIES>
           <DEFAULT_DEPENDENCIES/>
-          <CONFIG_ELEMENT name="coeff_val" type="uint8_t" typeUnSigned="true" byteSize="0x1" byteOffset="0x0" arrayElements="4096" min="0x0" max="0xff"
+          <CONFIG_ELEMENT name="coeff_val" type="uint8_t" typeUnSigned="true" byteSize="0x1" byteOffset="0x0" arrayElements="2048" min="0x0" max="0xff"
             default="0x0" description="Coefficient values" policy="BASIC"/>
         </PARAMETER>
         <PARAMETER name="PARAM_ID_GAIN_MODULE_MUTE" pid="0x8001232" maxSize="0x4" description="parameter used to receive the mute from the control module.">

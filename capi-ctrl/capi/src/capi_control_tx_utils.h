@@ -54,6 +54,7 @@ extern "C" {
 #define capi_gain_MAX_OUT_PORTS 1
 #define Q13_UNITY_GAIN 0x2000
 #define MAX_IMCL_PORT_SIZE 50
+#define COEFF_DATA     2048
 
 /********************************************** Bit Width Values ******************************************************/
 /* Bit width (actual width of the sample in a word) */
@@ -123,7 +124,7 @@ typedef struct capi_gain_t
 
    /* Struct to store gain configuration*/
    capi_gain_configuration_t gain_config;
-   uint8_t                 coeff_val[4096];
+   uint8_t                 coeff_val[COEFF_DATA];
    uint32_t                mute;
    
    /* IMCL */

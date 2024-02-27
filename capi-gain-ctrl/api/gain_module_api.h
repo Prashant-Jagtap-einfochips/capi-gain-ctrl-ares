@@ -36,6 +36,8 @@
 #define GAIN_MODULE_DATA_OUTPUT_PORT 0x1
 
 #define GAIN_MODULE_STACK_SIZE 8192
+#define COEFF_DATA             2048
+
 /*==============================================================================
    Module
 ==============================================================================*/
@@ -120,7 +122,7 @@ typedef struct control_tx_coeff_arr_t control_tx_coeff_arr_t;
 
 struct control_tx_coeff_arr_t
 {
-   uint8_t coeff_val[4096];
+   uint8_t coeff_val[COEFF_DATA];
    /**< @h2xmle_description {Coefficient values}
         @h2xmle_default     {0x00}
         @h2xmle_range       {0..0xFF}
