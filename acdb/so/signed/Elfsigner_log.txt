@@ -1,0 +1,2 @@
+Logging to /home/einfochips/Qualcomm/5.4.0.3/utils/scripts/12March/output/Elfsigner_log.txt
+ERROR: Keyboard Interrupt Received. Exiting!
